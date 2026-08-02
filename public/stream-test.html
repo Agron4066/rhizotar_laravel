@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ストリーミングテスト</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+        #output {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 80px;
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-top: 20px;
+        }
+        #status {
+            margin-top: 10px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+        button {
+            padding: 10px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+    <body>
+<h1>SSE ストリーミングテスト</h1>
+<button id="startBtn">ストリーミング開始</button>
+<div id="output"></div>
+<div id="status">待機中...</div>
+
+    <script>
+        const btn = document.getElementById('startBtn');
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+
+        btn.addEventListener('click', () => {
+            // 毎回リセット
+            output.textContent = '';
+            status.textContent = '受信中...';
+            btn.disabled = true;
+
+            const eventSource = new EventSource('/api/stream');
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.done) {
+                    // 終了シグナルを受け取ったら接続を閉じる
+                    eventSource.close();
+                    status.textContent = '完了！';
+                    btn.disabled = false;
+                    return;
+                }
+
+                if (data.text) {
+                    output.textContent += data.text;
+                }
+            };
+
+            eventSource.onerror = () => {
+                eventSource.close();
+                status.textContent = 'エラーが発生しました。';
+                btn.disabled = false;
+            };
+        });
+    </script>
+</body>
+</html>
