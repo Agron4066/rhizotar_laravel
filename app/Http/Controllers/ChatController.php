@@ -228,4 +228,47 @@ class ChatController extends Controller
         return response()->json($result);
     }
 
+    // ←← LINE検索対応で追加　←←
+    /**
+     * 非ストリーミングチャネル用の第2段階エンドポイント。
+     * continue() の同期版。キャッシュ復元ではなく messages を直接受け取る。
+     */
+    public function respondContinue(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'messages'             => 'required|array',
+            'response_style'       => 'nullable|string',
+            'analysis_guide'       => 'nullable|string',
+            'temperature_criteria' => 'nullable|string',
+        ]);
+
+        $messages            = $request->input('messages');
+        $responseStyle       = $request->input('response_style') ?? '';
+        $analysisGuide       = $request->input('analysis_guide') ?? '';
+        $temperatureCriteria = $request->input('temperature_criteria') ?? '';
+
+        $promptStructure = $this->promptBuilder->buildSecondStagePrompt($responseStyle, $analysisGuide, $temperatureCriteria);
+        $promptStructure->addStaticMessages($messages);
+        $built = $promptStructure->build();
+
+        $fullResponse = $this->claude->sendMessage($built['messages'], $built['system']);
+
+        $result = [
+            'response_text' => $fullResponse,
+        ];
+
+        $followUp = $this->customerHandler->extractFollowUp($fullResponse);
+        if ($followUp !== null) {
+            $result['follow_up'] = $followUp;
+        }
+
+        $result['analysis'] = $this->analysisHandler->extractAnalysis($fullResponse);
+
+        if ($this->appointmentHandler->extractAppointmentSignal($fullResponse)) {
+            $result['appointment_request'] = true;
+        }
+
+        return response()->json($result);
+    }
+
 }
