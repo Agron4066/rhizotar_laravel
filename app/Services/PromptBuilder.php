@@ -5,6 +5,13 @@ use App\Services\PromptStructure;
 
 class PromptBuilder
 {
+    private bool $appointmentEnabled = true;
+
+    public function setAppointmentEnabled(bool $enabled): void
+    {
+        $this->appointmentEnabled = $enabled;
+    }
+
     /**
      * 第1段階用システムプロンプトを返す
      * （訪問者の発言 → 検索条件JSON生成のための指示）
@@ -425,6 +432,10 @@ Kumitoruは、AIを信じすぎない「制御型AIエージェント」サー�
      */
     private function buildAppointmentSection(bool $conditionalOnNoSearch = false): string
     {
+        if (!$this->appointmentEnabled) {
+            return '';
+        }
+
         $section = '【デモ・相談予約シグナルの出力】
 
 会話の中で、以下の条件がすべて揃ったと判断した場合、応答テキストの末尾に <APPOINTMENT></APPOINTMENT> タグを出力してください。このタグは訪問者には表示されず、システムがデモ・相談の予約候補日時を提示するトリガーとして使用します。

@@ -99,6 +99,9 @@ class ChatControllerTest extends TestCase  // ←← 機能2 Step 6 で新設 �
 
         // PromptBuilder を Mock 化して引数を検証
         $mockBuilder = $this->mock(PromptBuilder::class);
+        $mockBuilder->shouldReceive('setAppointmentEnabled')
+            ->once()
+            ->with(true);
         $mockBuilder->shouldReceive('buildFirstStagePrompt')
             ->once()
             ->with($expectedTargets)

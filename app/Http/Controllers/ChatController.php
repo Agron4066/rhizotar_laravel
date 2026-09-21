@@ -10,6 +10,7 @@ use App\Services\Handlers\CustomerHandler;
 use App\Services\Handlers\AnalysisHandler;
 use App\Services\Handlers\AppointmentHandler;
 use App\Services\Handlers\Exceptions\SessionNotFoundException;
+use Illuminate\Support\Facades\Cache;
 
 class ChatController extends Controller
 {
@@ -38,6 +39,7 @@ class ChatController extends Controller
             'temperature_criteria' => 'nullable|string',
             'identification_type'  => 'nullable|string|in:web,twitter,instagram',
             'identification_value' => 'nullable|string|max:255',
+            'appointment_enabled'  => 'nullable|boolean',
         ]);
 
         $message                = $request->input('message');
@@ -46,8 +48,9 @@ class ChatController extends Controller
         $availableSearchTargets = $request->input('available_search_targets');
         $identificationType     = $request->input('identification_type');
         $identificationValue    = $request->input('identification_value');
+        $appointmentEnabled     = $request->input('appointment_enabled', true);
 
-        return response()->stream(function () use ($sessionId, $message, $pastMessages, $availableSearchTargets, $identificationType, $identificationValue) {
+        return response()->stream(function () use ($sessionId, $message, $pastMessages, $availableSearchTargets, $identificationType, $identificationValue, $appointmentEnabled) {
 
             // ←← Phase13 ステップ4で変更：SSE発火を共通クロージャに集約 ←←
             $sseCallback = function (array $payload) {
@@ -57,6 +60,9 @@ class ChatController extends Controller
             };
 
             $fullResponse = '';
+
+            $this->promptBuilder->setAppointmentEnabled((bool) $appointmentEnabled);
+            Cache::put("appointment_enabled:{$sessionId}", (bool) $appointmentEnabled, 600);
 
             // ←← 機能2 Step 6 で改修 ここから ←←
             // PromptStructure の組み立て（判断A・M の責務分担に従う）
@@ -134,7 +140,7 @@ class ChatController extends Controller
             abort(404, $e->getMessage());
         }
 
-        return response()->stream(function () use ($messages, $responseStyle, $analysisGuide, $temperatureCriteria, $identificationType, $identificationValue) {
+        return response()->stream(function () use ($messages, $responseStyle, $analysisGuide, $temperatureCriteria, $identificationType, $identificationValue, $sessionId) {
 
             // ←← Phase13 ステップ4で変更:SSE発火を共通クロージャに集約 ←←
             $sseCallback = function (array $payload) {
@@ -142,6 +148,9 @@ class ChatController extends Controller
                 ob_flush();
                 flush();
             };
+
+            $appointmentEnabled = Cache::get("appointment_enabled:{$sessionId}", true);
+            $this->promptBuilder->setAppointmentEnabled((bool) $appointmentEnabled);
 
             // PromptStructure の組み立て（判断L の責務分担に従う）
             $promptStructure = $this->promptBuilder->buildSecondStagePrompt($responseStyle, $analysisGuide, $temperatureCriteria);
